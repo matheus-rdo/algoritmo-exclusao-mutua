@@ -1,12 +1,15 @@
-*.class
+### Code-Java ###
+# Language Support for Java(TM) by Red Hat extension for Visual Studio Code - https://marketplace.visualstudio.com/items?itemName=redhat.java
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+.project
+.classpath
+.settings
+.idea
+*.iml
+factoryConfiguration.json
 
-# Package Files #
-*.jar
-*.war
-*.ear
+### Java-Web ###
+## ignoring target file
+target/
 
-# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
-hs_err_pid*
+# End of https://www.gitignore.io/api/java-web,code-java
