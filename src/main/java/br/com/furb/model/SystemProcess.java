@@ -2,14 +2,17 @@ package br.com.furb.model;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import br.com.furb.util.RandomUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import br.com.furb.Cluster;
 
-public class SystemProcess {
+public class SystemProcess implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(Cluster.class);
 
@@ -23,10 +26,39 @@ public class SystemProcess {
         return id;
     }
 
-    public void requestToCoordinator() {
-        if (!Cluster.getInstance().getCoordinator().isPresent()) {
+    public void consumeResource() {
+        Optional<Coordinator> maybeCoordinator = Cluster.getInstance().getCoordinator();
+        if (!maybeCoordinator.isPresent()) {
             log.info("Uma eleição foi convocada pelo processo " + this.toString());
             startElection();
+        } else {
+            maybeCoordinator.get().addProcessing(getResourceProcess());
+        }
+    }
+
+    public Runnable getResourceProcess() {
+        return () -> {
+            long processingMs = RandomUtil.nextLong(5000, 15000);
+            long seconds = TimeUnit.MILLISECONDS.toSeconds(processingMs);
+            log.info(String.format("Processando recurso do processo %s por %d segundos", this.toString(), seconds));
+            sleep(processingMs);
+        };
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            long timeToConsumeResource = RandomUtil.nextLong(10000, 25000);
+            sleep(timeToConsumeResource);
+            consumeResource();
+        }
+    }
+
+    private void sleep(long milisseconds) {
+        try {
+            Thread.sleep(milisseconds);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
@@ -39,12 +71,9 @@ public class SystemProcess {
             if (biggerProcesses.isEmpty()) {
                 cluster.setCoordinator(Optional.of(new Coordinator(this.id)));
             } else {
-                biggerProcesses.stream().forEach(process -> {
-                    process.startElection();
-                });
+                biggerProcesses.stream().forEach(process -> process.startElection());
             }
         }
-
     }
 
     @Override
