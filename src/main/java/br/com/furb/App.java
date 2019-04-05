@@ -7,8 +7,8 @@ import java.util.Timer;
 
 public class App {
 
-    private static final int CREATE_PROCESS_DELAY = 3000;
-    private static final int DESACTIVATE_COORDINATOR_DELAY = 10000;
+    private static final int CREATE_PROCESS_DELAY = 40000;
+    private static final int DESACTIVATE_COORDINATOR_DELAY = 100000;
 
     public static void main(String[] args) throws InterruptedException {
         scheduleTasks();

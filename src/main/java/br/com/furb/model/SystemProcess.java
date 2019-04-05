@@ -2,7 +2,6 @@ package br.com.furb.model;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -14,16 +13,31 @@ import br.com.furb.Cluster;
 
 public class SystemProcess implements Runnable {
 
+    private static final long MIN_PROCESS_TIME = 5000;
+    private static final long MAX_PROCESS_TIME = 15000;
+
+    private static final long MIN_CONSUME_DELAY = 5000;
+    private static final long MAX_CONSUME_DELAY = 15000;
+
     private static final Logger log = LoggerFactory.getLogger(Cluster.class);
+    private static final Logger coordinatorLog = LoggerFactory.getLogger(Coordinator.class);
 
     private int id;
 
+    private Thread thread;
+
     public SystemProcess(int id) {
         this.id = id;
+        this.thread = new Thread(this);
+        this.thread.start();
     }
 
     public int getId() {
         return id;
+    }
+
+    public void interrupt() {
+        this.thread.interrupt();
     }
 
     public void consumeResource() {
@@ -31,16 +45,16 @@ public class SystemProcess implements Runnable {
         if (!maybeCoordinator.isPresent()) {
             log.info("Uma eleição foi convocada pelo processo " + this.toString());
             startElection();
-        } else {
-            maybeCoordinator.get().addProcessing(getResourceProcess());
         }
+        log.info("{} enviou recurso para o coordenador", toString());
+        Cluster.getInstance().getCoordinator().get().addProcessing(getResourceProcess());
     }
 
     public Runnable getResourceProcess() {
         return () -> {
-            long processingMs = RandomUtil.nextLong(5000, 15000);
+            long processingMs = RandomUtil.nextLong(MIN_PROCESS_TIME, MAX_PROCESS_TIME);
             long seconds = TimeUnit.MILLISECONDS.toSeconds(processingMs);
-            log.info(String.format("Processando recurso do processo %s por %d segundos", this.toString(), seconds));
+            coordinatorLog.info(String.format("Processando recurso do processo %s por %d segundos", this.toString(), seconds));
             sleep(processingMs);
         };
     }
@@ -48,7 +62,7 @@ public class SystemProcess implements Runnable {
     @Override
     public void run() {
         while (true) {
-            long timeToConsumeResource = RandomUtil.nextLong(10000, 25000);
+            long timeToConsumeResource = RandomUtil.nextLong(MIN_CONSUME_DELAY, MAX_CONSUME_DELAY);
             sleep(timeToConsumeResource);
             consumeResource();
         }
@@ -57,9 +71,7 @@ public class SystemProcess implements Runnable {
     private void sleep(long milisseconds) {
         try {
             Thread.sleep(milisseconds);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        } catch (InterruptedException e) {}
     }
 
     private void startElection() {
@@ -69,7 +81,7 @@ public class SystemProcess implements Runnable {
             List<SystemProcess> biggerProcesses = processes.stream().filter(p -> p.id > this.id)
                     .collect(Collectors.toList());
             if (biggerProcesses.isEmpty()) {
-                cluster.setCoordinator(Optional.of(new Coordinator(this.id)));
+                cluster.setCoordinator(this);
             } else {
                 biggerProcesses.stream().forEach(process -> process.startElection());
             }

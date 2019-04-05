@@ -30,37 +30,40 @@ public class Cluster {
     }
 
     public void createNewProcess() {
-        SystemProcess process = generateNewProcess();
+        int id = generateProcessId();
+        SystemProcess process = new SystemProcess(id);
         log.info("Criando novo processo " + process.toString());
         this.processes.add(process);
     }
 
     public void desactivateCoordinator() {
         if (coordinator.isPresent()) {
+            coordinator.get().interrupt();
             log.info(String.format("Coordenador %s foi desativado", coordinator.get()));
         }
         this.coordinator = Optional.empty();
     }
 
-    private SystemProcess generateNewProcess() {
-        SystemProcess process = new SystemProcess(new Random().nextInt(100));
-        boolean exists = processes.stream().filter(p -> p.equals(process)).findAny().isPresent();
+    private int generateProcessId() {
+        int id = new Random().nextInt(100);
+        boolean exists = processes.stream().filter(p -> p.getId() == id).findAny().isPresent();
         if (exists)
-            return generateNewProcess();
+            return generateProcessId();
 
-        return process;
+        return id;
     }
 
     public Optional<Coordinator> getCoordinator() {
         return coordinator;
     }
 
-    public void setCoordinator(Optional<Coordinator> coordinator) {
+    public void setCoordinator(SystemProcess processCoordinator) {
+        this.coordinator = Optional.of(new Coordinator(processCoordinator.getId()));
+        processCoordinator.interrupt();
+        this.processes.remove(processCoordinator);
         if (coordinator.isPresent()) {
             log.info(String.format("Processo %s foi eleito o novo coordenador", coordinator.get().toString()));
         }
-
-        this.coordinator = coordinator;
     }
 
     public List<SystemProcess> getProcesses() {
