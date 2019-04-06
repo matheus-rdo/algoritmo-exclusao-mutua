@@ -13,106 +13,101 @@ import br.com.furb.Cluster;
 
 public class SystemProcess implements Runnable {
 
-    private static final long MIN_PROCESS_TIME = 5000;
-    private static final long MAX_PROCESS_TIME = 15000;
+	private static final long MIN_PROCESS_TIME = 5000;
+	private static final long MAX_PROCESS_TIME = 15000;
 
-    private static final long MIN_CONSUME_DELAY = 5000;
-    private static final long MAX_CONSUME_DELAY = 15000;
+	private static final long MIN_CONSUME_DELAY = 5000;
+	private static final long MAX_CONSUME_DELAY = 15000;
 
-    private static final Logger log = LoggerFactory.getLogger(Cluster.class);
-    private static final Logger coordinatorLog = LoggerFactory.getLogger(Coordinator.class);
+	private static final Logger log = LoggerFactory.getLogger(Cluster.class);
+	private static final Logger coordinatorLog = LoggerFactory.getLogger(Coordinator.class);
 
-    private int id;
+	private int id;
 
-    private Thread thread;
+	public SystemProcess(int id) {
+		this.id = id;
+	}
 
-    public SystemProcess(int id) {
-        this.id = id;
-        this.thread = new Thread(this);
-        this.thread.start();
-    }
+	public int getId() {
+		return id;
+	}
 
-    public int getId() {
-        return id;
-    }
+	public void consumeResource() {
+		Optional<Coordinator> maybeCoordinator = Cluster.getInstance().getCoordinator();
+		if (!maybeCoordinator.isPresent()) {
+			log.info("Uma eleição foi convocada pelo processo " + this.toString());
+			startElection();
+		} else {
+			maybeCoordinator.get().addProcessing(getResourceProcess());
+			log.info("{} enviou recurso para o coordenador", toString());
+		}
+	}
 
-    public void interrupt() {
-        this.thread.interrupt();
-    }
+	public Runnable getResourceProcess() {
+		return () -> {
+			long processingMs = RandomUtil.nextLong(MIN_PROCESS_TIME, MAX_PROCESS_TIME);
+			long seconds = TimeUnit.MILLISECONDS.toSeconds(processingMs);
+			coordinatorLog.info(
+					String.format("Processando recurso do processo %s por %d segundos", this.toString(), seconds));
+			sleep(processingMs);
+		};
+	}
 
-    public void consumeResource() {
-        Optional<Coordinator> maybeCoordinator = Cluster.getInstance().getCoordinator();
-        if (!maybeCoordinator.isPresent()) {
-            log.info("Uma eleição foi convocada pelo processo " + this.toString());
-            startElection();
-        }
-        log.info("{} enviou recurso para o coordenador", toString());
-        Cluster.getInstance().getCoordinator().get().addProcessing(getResourceProcess());
-    }
+	@Override
+	public void run() {
+		while (Cluster.getInstance().getProcesses().contains(this)) {
+			long timeToConsumeResource = RandomUtil.nextLong(MIN_CONSUME_DELAY, MAX_CONSUME_DELAY);
+			sleep(timeToConsumeResource);
+			consumeResource();
+		}
+	}
 
-    public Runnable getResourceProcess() {
-        return () -> {
-            long processingMs = RandomUtil.nextLong(MIN_PROCESS_TIME, MAX_PROCESS_TIME);
-            long seconds = TimeUnit.MILLISECONDS.toSeconds(processingMs);
-            coordinatorLog.info(String.format("Processando recurso do processo %s por %d segundos", this.toString(), seconds));
-            sleep(processingMs);
-        };
-    }
+	private void sleep(long milisseconds) {
+		try {
+			Thread.sleep(milisseconds);
+		} catch (InterruptedException e) {
+		}
+	}
 
-    @Override
-    public void run() {
-        while (true) {
-            long timeToConsumeResource = RandomUtil.nextLong(MIN_CONSUME_DELAY, MAX_CONSUME_DELAY);
-            sleep(timeToConsumeResource);
-            consumeResource();
-        }
-    }
+	private void startElection() {
+		Cluster cluster = Cluster.getInstance();
+		if (!cluster.getCoordinator().isPresent()) {
+			List<SystemProcess> processes = cluster.getProcesses();
+			List<SystemProcess> biggerProcesses = processes.stream().filter(p -> p.id > this.id)
+					.collect(Collectors.toList());
+			if (biggerProcesses.isEmpty()) {
+				cluster.setCoordinator(this);
+			} else {
+				biggerProcesses.stream().forEach(process -> process.startElection());
+			}
+		}
+	}
 
-    private void sleep(long milisseconds) {
-        try {
-            Thread.sleep(milisseconds);
-        } catch (InterruptedException e) {}
-    }
+	@Override
+	public String toString() {
+		return "[ID:" + id + "]";
+	}
 
-    private void startElection() {
-        Cluster cluster = Cluster.getInstance();
-        if (!cluster.getCoordinator().isPresent()) {
-            List<SystemProcess> processes = cluster.getProcesses();
-            List<SystemProcess> biggerProcesses = processes.stream().filter(p -> p.id > this.id)
-                    .collect(Collectors.toList());
-            if (biggerProcesses.isEmpty()) {
-                cluster.setCoordinator(this);
-            } else {
-                biggerProcesses.stream().forEach(process -> process.startElection());
-            }
-        }
-    }
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + (int) (id ^ (id >>> 32));
+		return result;
+	}
 
-    @Override
-    public String toString() {
-        return "[ID:" + id + "]";
-    }
-
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + (int) (id ^ (id >>> 32));
-        return result;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj)
-            return true;
-        if (obj == null)
-            return false;
-        if (getClass() != obj.getClass())
-            return false;
-        SystemProcess other = (SystemProcess) obj;
-        if (id != other.id)
-            return false;
-        return true;
-    }
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		SystemProcess other = (SystemProcess) obj;
+		if (id != other.id)
+			return false;
+		return true;
+	}
 
 }

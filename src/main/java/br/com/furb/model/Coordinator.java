@@ -1,57 +1,62 @@
 package br.com.furb.model;
 
 import java.util.LinkedList;
-import java.util.Objects;
+import java.util.Optional;
 import java.util.Queue;
+
+import br.com.furb.Cluster;
 
 public class Coordinator implements Runnable {
 
-    private int id;
-    private Queue<Runnable> resourceQueue;
+	private int id;
+	private Queue<Runnable> resourceQueue;
 
-    private Thread thread;
+	public Coordinator(int id) {
+		this.id = id;
+		this.resourceQueue = new LinkedList<Runnable>();
+	}
 
-    public Coordinator(int id) {
-        this.id = id;
-        this.resourceQueue = new LinkedList();
-        this.thread = new Thread(this);
-        this.thread.start();
-    }
+	@Override
+	public void run() {
+		Optional<Coordinator> maybeCoordinador;
+		while ((maybeCoordinador = Cluster.getInstance().getCoordinator()).isPresent()
+				&& maybeCoordinador.get().equals(this)) {
+			Runnable resource;
+			while ((resource = resourceQueue.poll()) != null) {
+				resource.run();
+			}
+		}
+	}
 
-    public void interrupt() {
-        this.thread.interrupt();
-    }
+	public void addProcessing(Runnable process) {
+		this.resourceQueue.add(process);
+	}
 
-    @Override
-    public void run() {
-        while (true) {
-            Runnable resource;
-            while ((resource = resourceQueue.poll()) != null) {
-                resource.run();
-            }
-        }
-    }
+	@Override
+	public String toString() {
+		return "[ID:" + id + "]";
+	}
 
-    public void addProcessing(Runnable process) {
-        this.resourceQueue.add(process);
-    }
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		int result = 1;
+		result = prime * result + id;
+		return result;
+	}
 
-    @Override
-    public String toString() {
-        return "[ID:" + id + "]";
-    }
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
+		if (obj == null)
+			return false;
+		if (getClass() != obj.getClass())
+			return false;
+		Coordinator other = (Coordinator) obj;
+		if (id != other.id)
+			return false;
+		return true;
+	}
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Coordinator that = (Coordinator) o;
-        return id == that.id &&
-                Objects.equals(resourceQueue, that.resourceQueue);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id);
-    }
 }
