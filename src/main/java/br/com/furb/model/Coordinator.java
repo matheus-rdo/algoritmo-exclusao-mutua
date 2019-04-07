@@ -3,6 +3,7 @@ package br.com.furb.model;
 import java.util.LinkedList;
 import java.util.Optional;
 import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 
 import br.com.furb.Cluster;
 
@@ -13,16 +14,14 @@ public class Coordinator implements Runnable {
 
 	public Coordinator(int id) {
 		this.id = id;
-		this.resourceQueue = new LinkedList<Runnable>();
+		this.resourceQueue = new ArrayBlockingQueue<>(20);
 	}
 
 	@Override
 	public void run() {
-		Optional<Coordinator> maybeCoordinador;
-		while ((maybeCoordinador = Cluster.getInstance().getCoordinator()).isPresent()
-				&& maybeCoordinador.get().equals(this)) {
+		while (isClusterCoordinator()) {
 			Runnable resource;
-			while ((resource = resourceQueue.poll()) != null) {
+			while ((resource = resourceQueue.poll()) != null && isClusterCoordinator()) {
 				resource.run();
 			}
 		}
@@ -30,6 +29,11 @@ public class Coordinator implements Runnable {
 
 	public void addProcessing(Runnable process) {
 		this.resourceQueue.add(process);
+	}
+
+	private boolean isClusterCoordinator() {
+		Optional<Coordinator> maybeCoordinador = Cluster.getInstance().getCoordinator();
+		return maybeCoordinador.isPresent() && maybeCoordinador.get().equals(this);
 	}
 
 	@Override

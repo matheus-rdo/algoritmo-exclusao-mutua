@@ -19,7 +19,7 @@ public class SystemProcess implements Runnable {
 	private static final long MIN_CONSUME_DELAY = 5000;
 	private static final long MAX_CONSUME_DELAY = 15000;
 
-	private static final Logger log = LoggerFactory.getLogger(Cluster.class);
+	private static final Logger log = LoggerFactory.getLogger(SystemProcess.class);
 	private static final Logger coordinatorLog = LoggerFactory.getLogger(Coordinator.class);
 
 	private int id;
@@ -38,8 +38,8 @@ public class SystemProcess implements Runnable {
 			log.info("Uma eleição foi convocada pelo processo " + this.toString());
 			startElection();
 		} else {
+			log.info("{} enviou um recurso para o coordenador", toString());
 			maybeCoordinator.get().addProcessing(getResourceProcess());
-			log.info("{} enviou recurso para o coordenador", toString());
 		}
 	}
 
